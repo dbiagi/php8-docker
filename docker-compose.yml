@@ -1,0 +1,63 @@
+version: '3.9'
+services:
+    php:
+        container_name: api-php-fpm
+        build:
+            context: ./php-fpm
+            args:
+                PHP_XDEBUG_MODE: ${PHP_XDEBUG_MODE}
+                PHP_XDEBUG_CLIENT_PORT: ${PHP_XDEBUG_CLIENT_PORT}
+                PHP_XDEBUG_CLIENT_HOST: ${PHP_XDEBUG_CLIENT_HOST}
+                SYMFONY_CLI_VERSION: 4.23.2
+                API_APPLICATION_PATH: ${API_APPLICATION_PATH}
+        depends_on:
+            - pgdb
+            - rabbitmq
+        environment:
+            PHP_IDE_CONFIG: "serverName=api"
+        volumes:
+            - ${API_APPLICATION_PATH}:/var/www/api:cached
+
+    nginx:
+        container_name: api-nginx
+        build: 
+            context: ./nginx
+            args:
+                NGINX_SERVER_NAME: ${NGINX_SERVER_NAME}
+        ports:
+            - "${NGINX_PORT}:80"
+        depends_on:
+            - php
+        environment:
+            - NGINX_SERVER_NAME=${NGINX_SERVER_NAME}
+        volumes:
+            - ./logs/nginx:/var/log/nginx:cached
+            - ${API_APPLICATION_PATH}:/var/www/api:cached
+
+    pgdb:
+        image: postgres:13.3
+        container_name: pgdb
+        restart: unless-stopped
+        environment:
+            #POSTGRES_DB: "${DB_DATABASE}"
+            POSTGRES_USER: "${DB_USERNAME}"
+            POSTGRES_PASSWORD: "${DB_PASSWORD}"
+        tty: true
+        ports:
+            - "${DB_PORT}:5432"
+        volumes:
+            - dbdata:/var/lib/postgresql/data
+
+    rabbitmq:
+        image: rabbitmq:3-management-alpine
+        container_name: 'rabbitmq'
+        ports:
+            - 15672:15672
+        volumes:
+            - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
+            - ./logs/rabbitmq:/var/log/rabbitmq
+            - rabbitmq-data:/var/lib/rabbitmq/
+
+volumes:
+    dbdata: ~
+    rabbitmq-data: ~
